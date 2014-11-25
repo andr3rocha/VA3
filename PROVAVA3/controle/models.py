@@ -1,6 +1,7 @@
 #coding:utf-8
 from django.db import models
 from localflavor.br.br_states import STATE_CHOICES
+from django.core.exceptions import ValidationError
 
 # Create your models here.
 
@@ -10,15 +11,18 @@ SEXO_OPCOES = [
 	('F','Feminino'),
 
 ]
-class acesso(models.Model):
-	nivelacesso = models.CharField('Nivel de Acesso',max_length=100,null=True)
-	def __unicode__(self):
-		return self.nivelacesso
+NIVEL_ACESSO = [
+
+	(1,'Livre'),
+	(2,'Restrito'),
+	(3,'Reservado')
+
+]
 
 class Pessoa(models.Model):
 	
 	Nome = models.CharField('Nome',max_length=100,null=True)
-	nivelacesso = models.ForeignKey(acesso,verbose_name="Nivel de Acesso",null=True)
+	nivelacesso = models.IntegerField('Nivel de Acesso',choices=NIVEL_ACESSO,null=True)
 	Sexo = models.CharField('Sexo',max_length=1,choices=SEXO_OPCOES,null=True)
 	CPF = models.CharField('CPF',max_length=14,unique=True,null=True)
 	DataNascimento = models.DateField('Data de Nascimento',null=True)
@@ -40,22 +44,33 @@ class Pessoa(models.Model):
 
 class lugar(models.Model):
 	NomeLugar = models.CharField('Nome do Lugar',max_length=100,null=True)
-	nivelacesso = models.ForeignKey(acesso,verbose_name="Nivel de Acesso",null=True)
+	nivelacesso = models.IntegerField('Nivel de Acesso',choices=NIVEL_ACESSO,null=True)
 	
 	def __unicode__(self):
 		return self.NomeLugar
 
 class validacao(models.Model):
-	nivelacesso = models.ForeignKey(acesso,verbose_name="Nivel de Acesso",null=True)
-	Nome = models.ForeignKey(Pessoa,verbose_name="Nome",null=True)
-	NomeLugar = models.ForeignKey(lugar,verbose_name="Nome do Lugar",null=True)
-	Entrada = models.DateTimeField('Registro Entrada',null=True)
-	Saida = models.DateTimeField('Registro Saida',null=True)
+	lugar = models.ForeignKey(lugar,verbose_name='Lugar de Acesso')
+	Pessoa = models.ForeignKey(Pessoa,verbose_name="Pessoa")
+	Entrada = models.DateTimeField('Registro Entrada',auto_now=True,null=True)
+	Saida = models.DateTimeField('Registro Saida',blank=True,null=True)
 	
-	#def clean(self):
-		#q = nivelacesso.objects.filter(nivelacesso=self.acesso,nome=self.Pessoa)
-		#if not q:
-			#raise ValidationError("Pessoa não autorizada")
+	def __unicode__(self):
+		return "%s - %s"% (self.Pessoa,self.lugar)
+	
+	def clean (self):
+		
+		q = validacao.objects.filter(Pessoa=self.Pessoa,Saida__isnull=True)
+		if q and self.id == None:
+			raise ValidationError("Usuario Ja se encontra em outro Lugar")
+		
+		if self.lugar.nivelacesso > self.Pessoa.nivelacesso:
+			raise ValidationError ("Usuario sem Permissão de acesso")
+		
+	
+	
+	
+	
 	
 	
 
